@@ -1,45 +1,52 @@
-CreateConVar("r6_server_allow_teamkillmark", "1", FCVAR_ARCHIVE, "If disabled, all killmarkers will appear red, no matter the team. Can be disabled in case teams shouldn't be revealed to players.", 0, 1)
-CreateConVar("r6_server_coop", "0", FCVAR_ARCHIVE, "If enabled, all players will be counted as friendly, giving white killmarkers for players. Use in PvE.", 0, 1)
-CreateConVar("r6_server_npcteams", "0", FCVAR_ARCHIVE, "If enabled, NPCs that count as 'friends' (citizens, rebels, etc.) will show a white killmarker when killed.", 0, 1)
-CreateConVar("r6_server_allow_npckillmark", "1", FCVAR_ARCHIVE, "Allows players to see killmarkers when they kill an npc. For server owners only.", 0, 1)
-CreateConVar("r6_server_allow_playerkillmark", "1", FCVAR_ARCHIVE, "Allows players to see killmarkers when they kill a player. For server owners only.", 0, 1)
+local net_Start = net.Start
+local net_WriteBool = net.WriteBool
+local net_WriteEntity = net.WriteEntity
+local net_Send = net.Send
+local IsFriendEntityName = IsFriendEntityName
 
+util.AddNetworkString( "r6Killmark" )
 
-util.AddNetworkString("r6Killmark")
+local cvarFlags = { FCVAR_ARCHIVE, FCVAR_REPLICATED }
+local teamKillMark = CreateConVar( "r6_server_allow_teamkillmark", "1", cvarFlags, "If disabled, all killmarkers will appear red, no matter the team. Can be disabled in case teams shouldn't be revealed to players.", 0, 1 )
+local plyCoop = CreateConVar( "r6_server_coop", "0", cvarFlags, "If enabled, all players will be counted as friendly, giving white killmarkers for players. Use in PvE.", 0, 1 )
+local npcTeams = CreateConVar( "r6_server_npcteams", "0", cvarFlags, "If enabled, NPCs that count as 'friends' (citizens, rebels, etc.) will show a white killmarker when killed.", 0, 1 )
+local npcKillMark = CreateConVar( "r6_server_allow_npckillmark", "1", cvarFlags, "Allows players to see killmarkers when they kill an npc. For server owners only.", 0, 1 )
+local plyKillMark = CreateConVar( "r6_server_allow_playerkillmark", "1", cvarFlags, "Allows players to see killmarkers when they kill a player. For server owners only.", 0, 1 )
 
-hook.Add("PlayerDeath", "r6KillmarkPlayer", function (victim, inflictor, attacker)
-  if (attacker:IsPlayer() and GetConVar("r6_server_allow_playerkillmark"):GetBool()) then
-    local friend = false 
-    if (GetConVar("r6_server_coop"):GetBool()) then
-      friend = true
+local function sendKillMark( ply, victim, friend )
+    if not teamKillMark:GetBool() then
+        friend = false
     end
-    if (victim:Team() ~= 0 and victim:Team() ~= 1001 and victim:Team() ~= 1002) then
-      if (victim:Team() == attacker:Team()) then
-        friend = true
-      end
-    end
-    sendKillMark(attacker, victim, friend)
-  end
-end)
 
-hook.Add("OnNPCKilled", "r6KillmarkNPC", function (npc, attacker)
-  if (attacker:IsPlayer() and GetConVar("r6_server_allow_npckillmark"):GetBool()) then
-    local friend = false 
-    if (GetConVar("r6_server_npcteams"):GetBool()) then
-      if (IsFriendEntityName(npc:GetClass())) then
-        friend = true
-      end
-    end
-    sendKillMark(attacker, npc, friend)
-  end
-end)
-
-function sendKillMark(ply, victim, friend)
-  if (not GetConVar("r6_server_allow_teamkillmark"):GetBool()) then
-    friend = false
-  end
-  net.Start("r6Killmark")
-  net.WriteBool(friend)
-  net.WriteEntity(victim)
-  net.Send(ply)
+    net_Start( "r6Killmark" )
+        net_WriteBool( friend )
+        net_WriteEntity( victim )
+    net_Send( ply )
 end
+
+hook.Add( "PlayerDeath", "r6KillmarkPlayer", function( victim, _, attacker )
+    if not attacker:IsPlayer() or not plyKillMark:GetBool() then return end
+    local friend = false
+
+    if plyCoop:GetBool() then
+        friend = true
+    end
+
+    local vicTeam = victim:Team()
+    if vicTeam ~= 0 and vicTeam ~= 1001 and vicTeam ~= 1002 and vicTeam == attacker:Team() then
+        friend = true
+    end
+
+    sendKillMark( attacker, victim, friend )
+end )
+
+hook.Add( "OnNPCKilled", "r6KillmarkNPC", function( npc, attacker )
+    if not attacker:IsPlayer() or not npcKillMark:GetBool() then return end
+    local friend = false
+
+    if npcTeams:GetBool() and IsFriendEntityName( npc:GetClass() ) then
+        friend = true
+    end
+
+    sendKillMark( attacker, npc, friend )
+end )
