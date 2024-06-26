@@ -1,9 +1,3 @@
-local net_Start = net.Start
-local net_WriteBool = net.WriteBool
-local net_WriteEntity = net.WriteEntity
-local net_Send = net.Send
-local IsFriendEntityName = IsFriendEntityName
-
 util.AddNetworkString( "r6Killmark" )
 
 local cvarFlags = { FCVAR_ARCHIVE, FCVAR_REPLICATED }
@@ -18,10 +12,10 @@ local function sendKillMark( ply, victim, friend )
         friend = false
     end
 
-    net_Start( "r6Killmark" )
-        net_WriteBool( friend )
-        net_WriteEntity( victim )
-    net_Send( ply )
+    net.Start( "r6Killmark" )
+        net.WriteBool( friend )
+        net.WriteEntity( victim )
+    net.Send( ply )
 end
 
 hook.Add( "PlayerDeath", "r6KillmarkPlayer", function( victim, _, attacker )
